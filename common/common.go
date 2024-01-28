@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strconv"
 )
 
@@ -110,10 +111,6 @@ func Pipe(destination net.Conn, source net.Conn) {
 	}
 }
 
-// move to env vars
-const MaxPortNumber = 65535
-const ControlPort = 60570
-
 var ErrMaxPortNumber = errors.New("port number exceeds allowed value")
 var ErrInvalidPort = errors.New("port number exceeds allowed value")
 
@@ -123,12 +120,15 @@ func ParsePortNumber(payload []byte) (string, error) {
 		return "", errors.New("invalid port format")
 	}
 
-	if port == ControlPort {
+	controlPort, err := strconv.Atoi(os.Getenv("CONTROL_PORT"))
+	if port == controlPort {
 		return "", ErrInvalidPort
 	}
 
-	if port > MaxPortNumber {
+	maxAllowedPortNumber, err := strconv.Atoi(os.Getenv("MAX_ALLOWED_PORT_NUMBER"))
+	if port > maxAllowedPortNumber {
 		return "", ErrMaxPortNumber
 	}
+
 	return fmt.Sprint(port), nil
 }

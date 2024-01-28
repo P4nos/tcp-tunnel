@@ -23,7 +23,7 @@ func isLocalPortAvailable(host string) bool {
 	if err != nil {
 		return false
 	}
-	defer connDestination.Close()
+	connDestination.Close()
 	return true
 }
 
@@ -81,18 +81,20 @@ func (c *ClientConfig) Shutdown() {
 }
 
 func New(forwardPort int) (ClientConfig, error) {
-	forwardTo := "localhost:" + fmt.Sprint(forwardPort)
-	if err := isLocalPortAvailable(forwardTo); !err {
-		return ClientConfig{}, errors.New("forwarding port not available")
-	}
 
 	err := godotenv.Load(".env")
 	if err != nil {
 		return ClientConfig{}, err
 	}
 
-	serverUrl := os.Getenv("SERVER_URL")
-	connServer, err := tls.Dial("tcp", serverUrl, nil)
+	host := os.Getenv("SERVER_URL")
+
+	forwardTo := "localhost:" + fmt.Sprint(forwardPort)
+	if err := isLocalPortAvailable(forwardTo); !err {
+		return ClientConfig{}, errors.New("forwarding port not available")
+	}
+
+	connServer, err := tls.Dial("tcp", host, nil)
 	if err != nil {
 		return ClientConfig{}, err
 	}

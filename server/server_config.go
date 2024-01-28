@@ -4,12 +4,17 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/P4nos/tcp-tunnel/common"
 	"io"
 	"log"
 	"math/rand"
 	"net"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
+
+	"github.com/P4nos/tcp-tunnel/common"
+	"github.com/joho/godotenv"
 )
 
 type clientConnection struct {
@@ -74,10 +79,17 @@ func (s *ServerConfig) Shutdown() {
 }
 
 func Start() (ServerConfig, error) {
-	port := common.ControlPort
-	host := "localhost:" + fmt.Sprint(port)
-	// move to env vars
-	cert, err := tls.LoadX509KeyPair("./localhost.pem", "./localhost-key.pem")
+	err := godotenv.Load(".env")
+	if err != nil {
+		return ServerConfig{}, err
+	}
+
+	host := os.Getenv("SERVER_URL")
+	port := strings.Split(host, ":")[1]
+
+	tlsCert := os.Getenv("TLS_CERT")
+	tlsKeyCert := os.Getenv("TLS_KEY_CERT")
+	cert, err := tls.LoadX509KeyPair(tlsCert, tlsKeyCert)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -102,13 +114,21 @@ func Start() (ServerConfig, error) {
 }
 
 func tryToBindPort() (int, error) {
-	// move to env vars
-	const min_port_value = 60000
-	const max_port_value = 61000
-	for _, val := range rand.Perm(max_port_value - min_port_value) {
-		port := min_port_value + val
+	minListenerPort, err := strconv.Atoi(os.Getenv("MIN_LISTENER_PORT_VALUE"))
+	if err != nil {
+		log.Fatal("missing MIN_LISTENER_PORT_VALUE env var")
+	}
 
-		host := "localhost:" + fmt.Sprint(port)
+	maxListenerPort, err := strconv.Atoi(os.Getenv("MAX_LISTENER_PORT_VALUE"))
+	if err != nil {
+		log.Fatal("missing MAX_LISTENER_PORT_VALUE env var")
+	}
+
+	for _, val := range rand.Perm(maxListenerPort - minListenerPort) {
+		port := minListenerPort + val
+
+		hostUrl := os.Getenv("SERVER_URL")
+		host := strings.Split(hostUrl, ":")[0] + ":" + fmt.Sprint(port)
 		l, err := net.Listen("tcp", host)
 		if err != nil {
 			// assume that port is already in use
@@ -130,7 +150,10 @@ func (s *ServerConfig) createPortListener(c net.Conn) {
 		common.SendMessage(c, common.Message{MessageType: common.Error, PayloadSize: 0, Payload: nil})
 	}
 
-	host := "localhost:" + fmt.Sprint(port)
+	hostUrl := os.Getenv("SERVER_URL")
+	host := strings.Split(hostUrl, ":")[0]
+	host = host + ":" + fmt.Sprint(port)
+
 	listener, err := net.Listen("tcp", host)
 	if err != nil {
 		log.Println("failed to create listener for client ", clientId, host, err)
